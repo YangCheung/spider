@@ -16,3 +16,13 @@ class DiyItem(scrapy.Item):
     desc = scrapy.Field()
     article = scrapy.Field()
     last_updated = scrapy.Field(serializer=str)
+
+
+
+class PetCategory(scrapy.Item):
+    category = scrapy.Field()
+    url = scrapy.Field()
+    cover = scrapy.Field()
+    title = scrapy.Field()
+    desc = scrapy.Field()
+    last_updated = scrapy.Field(serializer=str)
