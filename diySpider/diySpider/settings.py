@@ -66,6 +66,8 @@ ROBOTSTXT_OBEY = True
 # See https://doc.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
    'diySpider.pipelines.DiyspiderPipeline': 300,
+   'diySpider.pipelines.PetspiderPipeline': 400,
+   'diySpider.pipelines.PetArticlePipeline': 500
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
