@@ -7,14 +7,20 @@
 
 import scrapy
 
-class DiyItem(scrapy.Item):
-    category = scrapy.Field()
-    url = scrapy.Field()
-    backgroundImg = scrapy.Field()
+class ThreadItem(scrapy.Item):
+    tid = scrapy.Field()
     title = scrapy.Field()
-    desc = scrapy.Field()
-    article = scrapy.Field()
-    last_updated = scrapy.Field(serializer=str)
+    turl = scrapy.Field()
+    with_img_attach = scrapy.Field()
+    with_file_attach = scrapy.Field()
+    tag = scrapy.Field()
+    author_uid = scrapy.Field()
+    author_username = scrapy.Field()
+    publish_date = scrapy.Field()
+    follow_post_count = scrapy.Field()
+    read_count = scrapy.Field()
+    last_post_username = scrapy.Field()
+    last_post_date = scrapy.Field()
 
 class PetItem(scrapy.Item):
     category = scrapy.Field()

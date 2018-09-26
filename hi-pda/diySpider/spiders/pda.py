@@ -1,15 +1,21 @@
 import scrapy
-from diySpider.items import DiyItem
+from diySpider.items import ThreadItem
 from scrapy.spiders import CrawlSpider, Rule
 from scrapy.selector import Selector
 from scrapy.http import Request, FormRequest
+import os
+
+username = os.environ.get("hipda-user") or "username"
+pwd = os.environ.get("hipda-pwd") or "password"
 
 class QuotesSpider(scrapy.Spider):
     name = "pda"
-    HOST = "https://ertong.rouding.com"
+    startUrl = "https://www.hi-pda.com/forum/forumdisplay.php?fid=7&page=%s"
+    page = 1
+    HOST = "https://www.hi-pda.com/forum/"
 
     def start_requests(self):    
-        request = scrapy.Request(url="https://www.hi-pda.com/forum/forumdisplay.php?fid=7&page=1", callback=self.parsePage)
+        request = scrapy.Request(url=((self.startUrl)%self.page), callback=self.parsePage)
         yield request
 
     # def start_requests(self):
@@ -23,8 +29,8 @@ class QuotesSpider(scrapy.Spider):
                 # headers = self.headers,
                 formdata = {
                     'loginfield': 'username',
-                    'username': 'sadsea',
-                    'password': 'b6882e4d39e32c1cf596016f943cd73b',
+                    'username': username,
+                    'password': pwd,
                     'questionid': '0',
                     'answer': ''
                 },
@@ -38,83 +44,72 @@ class QuotesSpider(scrapy.Spider):
             meta = {'cookiejar' : response.meta['cookiejar']}, 
             callback = self.parsePage
             )
-        yield request
-        # resultArray = response.css("div[class=all]").css("a")
-        # nextPage = response.xpath('//a[contains(text(), ">")]/@href').extract_first()
-        # category = response.meta["category"]
-        # self.log('next page = %s' % (nextPage))
-        # for tempResult in resultArray:
-        #     item = DiyItem()
-        #     item["category"] = category
-        #     url = tempResult.xpath("@href").extract_first()
-        #     item["url"] = url
-        #     backgroundImg = tempResult.re_first(r"\(.*\)")
-        #     if backgroundImg:
-        #         item["backgroundImg"] = "https://%s"%(backgroundImg.replace("(//", "").replace(")", ""))
-        #     item["title"] = tempResult.css("div[class=x7]::text").extract_first()
-        #     item["desc"] = tempResult.css("div[class=x8]::text").extract_first()
-        #     request = scrapy.Request(url = ("%s%s"%(self.HOST, url)), callback = self.parsePage)
-        #     request.meta['item'] = item
-        #     yield request
-
-        # if nextPage and nextPage != "#":
-        #     request = scrapy.Request(url = ("%s%s"%(self.HOST, nextPage)), callback = self.parse)
-        #     request.meta['category'] = category
-        #     yield request
+        yield request    
         
     def parsePage(self, response):
-        # resultArray = response.css("tbody")
-        resultArray = response.xpath('//tbody[contains(@id, "normalthread")]')
-        # print(resultArray.extract())
+        resultArray = response.xpath('//tbody[contains(@id, "normalthread_")]')
         for tempResult in resultArray:
             tid = tempResult.attrib.get('id')
-            # print(tid)
-            title = tempResult.xpath('.//span/a/text()').extract_first()
-            turl = tempResult.xpath('.//span/a/@href').extract_first()    
-            print(title)
-            print(turl)
+            if tid and tid.startswith("normalthread_"):
+                threadItem = ThreadItem()
+                threadItem.tid = tid.replace("normalthread_", "")
+                # print(tid)
+                threadItem.title = tempResult.xpath('.//span[@id]/a/text()').extract_first()
+                threadItem.turl = tempResult.xpath('.//span[@id]/a/@href').extract_first()    
+                # print(title)
+                # print(turl)
 
-            hasImageAttach = len(tempResult.xpath('.//img[@alt="图片附件"]')) > 0
-            print("hasImageAttach %s"%hasImageAttach)
-            hasFileAttach = len(tempResult.xpath('.//img[@alt="附件"]')) > 0
-            print("hasFileAttach %s"%hasFileAttach)
+                threadItem.with_img_attach = len(tempResult.xpath('.//img[@alt="图片附件"]')) > 0
+                # print("hasImageAttach %s"%hasImageAttach)
+                threadItem.with_file_attach = len(tempResult.xpath('.//img[@alt="附件"]')) > 0
+                # print("hasFileAttach %s"%hasFileAttach)
 
-            tag = tempResult.xpath('.//em[contains(text(), "[")]/a/text()').extract_first()    
-            print("tag %s"%tag)
+                threadItem.tag = tempResult.xpath('.//em[contains(text(), "[")]/a/text()').extract_first()    
+                # print("tag %s"%tag)
 
-            author = tempResult.xpath('.//td[@class="author"]//a/text()').extract_first()    
-            print("author %s"%author)
+                threadItem.author_uid = tempResult.xpath('.//td[@class="author"]//a/@href').re_first("uid=([0-9]+)")
+                # print("authorUid %s"%authorUid)
+
+                threadItem.author_username = tempResult.xpath('.//td[@class="author"]//a/text()').extract_first()    
+                # print("author %s"%authorName)
+                
+                threadItem.publish_date = tempResult.xpath('.//td[@class="author"]/em/text()').extract_first()    
+                # print("%s"%publishDate)
+
+                postCount = tempResult.xpath('.//td[@class="nums"]/strong/text()').extract_first()    
+                try:
+                    postCount = int(postCount)
+                except ValueError as e:
+                    postCount = -1
+                threadItem.follow_post_count = postCount
+                # print("postCount = %s"%int(postCount))
+
+                readCount = tempResult.xpath('.//td[@class="nums"]/em/text()').extract_first()    
+                try:
+                    readCount = int(readCount)
+                except ValueError as e:
+                    readCount = -1
+                threadItem.read_count = readCount
+                # print("readCount = %s"%readCount)
+
+                threadItem.last_post_username = tempResult.xpath('.//td[@class="lastpost"]/cite/a/text()').extract_first()    
+                # print("lastPostUser = %s"%lastPostUser)
+
+                threadItem.last_post_date = tempResult.xpath('.//td[@class="lastpost"]/em/a/text()').extract_first()    
+                # print("lastPostDate = %s"%lastPostDate)
+                print(threadItem)
+                print("================")
+                yield threadItem
+
+                self.page += 1
+
+        nextPage = response.xpath('//a[@class="next"]/@href').extract_first()
+        if nextPage:
+            request = scrapy.Request(url=("%s%s")%(self.HOST, nextPage), callback=self.parsePage)
+            yield request
+
+
             
-            publishDate = tempResult.xpath('.//td[@class="author"]/em/text()').extract_first()    
-            print("%s"%publishDate)
-
-            postCount = tempResult.xpath('.//td[@class="nums"]/strong/text()').extract_first()    
-            try:
-                postCount = int(postCount)
-            except ValueError as e:
-                postCount = -1
-            print("postCount = %s"%int(postCount))
-
-            readCount = tempResult.xpath('.//td[@class="nums"]/em/text()').extract_first()    
-            try:
-                readCount = int(readCount)
-            except ValueError as e:
-                readCount = -1
-            print("readCount = %s"%readCount)
-
-            lastPostUser = tempResult.xpath('.//td[@class="lastpost"]/cite/a/text()').extract_first()    
-            print("lastPostUser = %s"%lastPostUser)
-
-            lastPostDate = tempResult.xpath('.//td[@class="lastpost"]/em/a/text()').extract_first()    
-            print("lastPostDate = %s"%lastPostDate)
-            print("================")
-            
-            # tid = tempResult.xpath("//tbody/@id").extract_first()
-            # print("tid = %s"%tid)
-        # article = response.css("div[id=zoom]").extract_first()
-        # if article:
-        #     item["article"] = article
-        #     yield item
         
         
 
